@@ -1,0 +1,265 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Banking System</title>
+  <link rel="stylesheet" href="./styles.css" />
+</head>
+<body>
+  <div class="app-shell">
+    <aside class="sidebar">
+      <div class="brand">
+        <div class="brand-mark">B</div>
+        <div>
+          <div class="brand-title">Banking System</div>
+          <div class="brand-subtitle">Node.js + PostgreSQL</div>
+        </div>
+      </div>
+
+      <nav class="nav-list" aria-label="Main navigation">
+        <button class="nav-item active" data-target="dashboard-section">Dashboard</button>
+        <button class="nav-item" data-target="users-section">Create User</button>
+        <button class="nav-item" data-target="accounts-section">Accounts</button>
+        <button class="nav-item" data-target="operations-section">Operations</button>
+        <button class="nav-item" data-target="history-section">History</button>
+      </nav>
+
+      <div class="sidebar-footer">
+        <div class="status-row">
+          <span id="api-dot" class="status-dot"></span>
+          <span id="api-status">Checking API...</span>
+        </div>
+        <button id="refresh-all-btn" class="button ghost full-width">Refresh data</button>
+      </div>
+    </aside>
+
+    <main class="main-content">
+      <header class="topbar">
+        <div>
+          <p class="eyebrow">BANKING DASHBOARD</p>
+          <h1>Account operations</h1>
+          <p class="muted">Create users and accounts, manage balances, transfer funds, and inspect transaction history.</p>
+        </div>
+        <div class="topbar-actions">
+          <span id="last-refresh" class="refresh-label">Not refreshed yet</span>
+        </div>
+      </header>
+
+      <section id="dashboard-section" class="page-section active-section">
+        <div class="stats-grid">
+          <article class="stat-card">
+            <span class="stat-label">Accounts</span>
+            <strong id="stat-accounts" class="stat-value">0</strong>
+            <span class="stat-note">Loaded from PostgreSQL</span>
+          </article>
+          <article class="stat-card">
+            <span class="stat-label">Total balance</span>
+            <strong id="stat-balance" class="stat-value">0.00</strong>
+            <span class="stat-note">Across currently loaded accounts</span>
+          </article>
+          <article class="stat-card">
+            <span class="stat-label">Selected account</span>
+            <strong id="stat-selected" class="stat-value smaller">None</strong>
+            <span class="stat-note">Used for balance/history shortcuts</span>
+          </article>
+        </div>
+
+        <div class="panel">
+          <div class="panel-header">
+            <div>
+              <h2>Accounts overview</h2>
+              <p>Live data from <code>GET /accounts</code></p>
+            </div>
+            <button id="refresh-accounts-btn" class="button secondary">Refresh accounts</button>
+          </div>
+          <div id="accounts-grid" class="accounts-grid"></div>
+          <div id="accounts-empty" class="empty-state hidden">
+            No accounts found yet. Create a user and then create an account.
+          </div>
+        </div>
+      </section>
+
+      <section id="users-section" class="page-section">
+        <div class="two-column-grid">
+          <div class="panel form-panel">
+            <div class="panel-header compact">
+              <div>
+                <h2>Create user</h2>
+                <p><code>POST /users</code></p>
+              </div>
+            </div>
+            <form id="create-user-form" class="form-grid">
+              <label>
+                First name
+                <input id="user-name" name="name" type="text" placeholder="Shushan" required />
+              </label>
+              <label>
+                Surname
+                <input id="user-surname" name="surname" type="text" placeholder="Meyroyan" required />
+              </label>
+              <label class="full-span">
+                Email
+                <input id="user-email" name="email" type="email" placeholder="shush@test.com" required />
+              </label>
+              <button class="button primary full-span" type="submit">Create user</button>
+            </form>
+          </div>
+
+          <div class="panel help-panel">
+            <h2>What happens here?</h2>
+            <ol class="steps-list">
+              <li>The GUI sends JSON to <code>POST /users</code>.</li>
+              <li>Your controller validates the fields.</li>
+              <li>The service inserts the user into PostgreSQL.</li>
+              <li>The returned <code>user.id</code> is automatically filled into the account form.</li>
+            </ol>
+            <div id="created-user-card" class="result-card hidden"></div>
+          </div>
+        </div>
+      </section>
+
+      <section id="accounts-section" class="page-section">
+        <div class="two-column-grid">
+          <div class="panel form-panel">
+            <div class="panel-header compact">
+              <div>
+                <h2>Create account</h2>
+                <p><code>POST /accounts</code></p>
+              </div>
+            </div>
+            <form id="create-account-form" class="form-grid">
+              <label>
+                User ID
+                <input id="account-user-id" name="user_id" type="number" min="1" placeholder="3" required />
+              </label>
+              <label>
+                Account number
+                <input id="account-number" name="account_number" type="text" placeholder="SH001" required />
+              </label>
+              <button class="button primary full-span" type="submit">Create account</button>
+            </form>
+          </div>
+
+          <div class="panel">
+            <div class="panel-header compact">
+              <div>
+                <h2>Account lookup</h2>
+                <p><code>GET /accounts/:id</code></p>
+              </div>
+            </div>
+            <form id="lookup-account-form" class="inline-form">
+              <input id="lookup-account-id" type="number" min="1" placeholder="Account ID" required />
+              <button class="button secondary" type="submit">Load account</button>
+            </form>
+            <div id="lookup-result" class="result-card hidden"></div>
+          </div>
+        </div>
+      </section>
+
+      <section id="operations-section" class="page-section">
+        <div class="operations-grid">
+          <div class="panel form-panel">
+            <div class="panel-header compact">
+              <div>
+                <h2>Deposit</h2>
+                <p><code>POST /accounts/:id/deposit</code></p>
+              </div>
+            </div>
+            <form id="deposit-form" class="form-grid single-column">
+              <label>
+                Account
+                <select id="deposit-account" required></select>
+              </label>
+              <label>
+                Amount
+                <input id="deposit-amount" type="number" min="0.01" step="0.01" placeholder="10000" required />
+              </label>
+              <button class="button success" type="submit">Deposit</button>
+            </form>
+          </div>
+
+          <div class="panel form-panel">
+            <div class="panel-header compact">
+              <div>
+                <h2>Withdraw</h2>
+                <p><code>POST /accounts/:id/withdraw</code></p>
+              </div>
+            </div>
+            <form id="withdraw-form" class="form-grid single-column">
+              <label>
+                Account
+                <select id="withdraw-account" required></select>
+              </label>
+              <label>
+                Amount
+                <input id="withdraw-amount" type="number" min="0.01" step="0.01" placeholder="5000" required />
+              </label>
+              <button class="button danger" type="submit">Withdraw</button>
+            </form>
+          </div>
+
+          <div class="panel form-panel transfer-panel">
+            <div class="panel-header compact">
+              <div>
+                <h2>Transfer</h2>
+                <p><code>POST /accounts/transfer</code></p>
+              </div>
+            </div>
+            <form id="transfer-form" class="form-grid">
+              <label>
+                From account
+                <select id="transfer-from" required></select>
+              </label>
+              <label>
+                To account
+                <select id="transfer-to" required></select>
+              </label>
+              <label class="full-span">
+                Amount
+                <input id="transfer-amount" type="number" min="0.01" step="0.01" placeholder="20000" required />
+              </label>
+              <button class="button primary full-span" type="submit">Transfer funds</button>
+            </form>
+          </div>
+        </div>
+      </section>
+
+      <section id="history-section" class="page-section">
+        <div class="panel">
+          <div class="panel-header history-header">
+            <div>
+              <h2>Transaction history</h2>
+              <p><code>GET /accounts/:id/transactions</code></p>
+            </div>
+            <div class="history-controls">
+              <select id="history-account"></select>
+              <button id="load-history-btn" class="button secondary">Load history</button>
+            </div>
+          </div>
+          <div class="table-wrap">
+            <table>
+              <thead>
+                <tr>
+                  <th>ID</th>
+                  <th>Type</th>
+                  <th>From</th>
+                  <th>To</th>
+                  <th>Amount</th>
+                  <th>Created</th>
+                </tr>
+              </thead>
+              <tbody id="history-body"></tbody>
+            </table>
+          </div>
+          <div id="history-empty" class="empty-state">Choose an account and load its history.</div>
+        </div>
+      </section>
+    </main>
+  </div>
+
+  <div id="toast-container" class="toast-container" aria-live="polite"></div>
+
+  <script src="./app.js" defer></script>
+</body>
+</html>
